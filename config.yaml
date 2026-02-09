@@ -1,0 +1,24 @@
+server:
+  port: 8080
+  base_url: "http://localhost:8080"
+
+app:
+  user_mode: "mws"  # "mws" = 直接复用 MWS 用户, "local" = 本地 users 表
+
+mysql:
+  dsn: "root:123456@tcp(127.0.0.1:3306)/mws365_demo?charset=utf8mb4&parseTime=true&loc=Local"
+
+mws:
+  base_url: "https://mws365.ru"
+
+openapi:
+  app_id: "your-app-id"
+  app_secret: "your-app-secret"
+  tenant_uuid: "your-tenant-uuid"
+  encrypt_key: ""  # 可选，用于事件签名验证
+
+oauth2:
+  client_id: "your-client-id"
+  client_secret: "your-client-secret"
+  redirect_uri: "http://localhost:8080/oauth2/callback"
+  scopes: "openid profile email"

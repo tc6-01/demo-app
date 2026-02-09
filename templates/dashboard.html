@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - MWS365 Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 900px; margin: 20px auto; padding: 0 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
+        .header h1 { font-size: 22px; }
+        .header-actions a { color: #666; text-decoration: none; margin-left: 16px; }
+        .header-actions a:hover { color: #1677ff; }
+        .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .card h2 { font-size: 16px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
+        .user-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .user-info .field { padding: 4px 0; }
+        .user-info .label { color: #888; font-size: 13px; }
+        .user-info .value { font-size: 14px; }
+        .btn { display: inline-block; padding: 8px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #1677ff; color: #fff; }
+        .btn-primary:hover { background: #0958d9; }
+        .btn-success { background: #52c41a; color: #fff; }
+        .btn-success:hover { background: #389e0d; }
+        .btn-sm { padding: 4px 12px; font-size: 13px; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .result { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 12px; margin-top: 12px; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; display: none; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+        .badge-blue { background: #e6f7ff; color: #1677ff; }
+        .badge-green { background: #f6ffed; color: #52c41a; }
+        .badge-gray { background: #fafafa; color: #888; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        th { color: #888; font-weight: 500; }
+        .empty { text-align: center; color: #ccc; padding: 24px; }
+        .stat { font-size: 28px; font-weight: 600; color: #1677ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Dashboard</h1>
+            <div class="header-actions">
+                <span class="badge badge-blue">{{.UserMode}} 模式</span>
+                <a href="/">首页</a>
+                <a href="/oauth2/logout">登出</a>
+            </div>
+        </div>
+
+        <!-- 用户信息 -->
+        <div class="card">
+            <h2>当前登录用户（OAuth2 UserInfo）</h2>
+            <div class="user-info">
+                <div class="field"><div class="label">Sub (ID)</div><div class="value">{{.User.Sub}}</div></div>
+                <div class="field"><div class="label">姓名</div><div class="value">{{.User.Name}}</div></div>
+                <div class="field"><div class="label">昵称</div><div class="value">{{.User.Nickname}}</div></div>
+                <div class="field"><div class="label">邮箱</div><div class="value">{{.User.Email}}</div></div>
+            </div>
+            <div style="margin-top: 12px;">
+                <a href="/oauth2/refresh" class="btn btn-sm btn-primary">刷新 Token</a>
+                <span style="color: #888; font-size: 12px; margin-left: 8px;">Token 过期时间: {{.Session.ExpiresAt.Format "2006-01-02 15:04:05"}}</span>
+            </div>
+        </div>
+
+        <!-- OpenAPI 操作 -->
+        <div class="card">
+            <h2>OpenAPI 操作</h2>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="callAPI('/api/tenant-token')">获取 Tenant Token</button>
+                {{if eq .UserMode "local"}}
+                <button class="btn btn-success" onclick="triggerSync()">全量同步用户</button>
+                <span style="line-height: 36px; color: #888;">本地用户: <span class="stat" style="font-size: 18px;">{{.UserCount}}</span> 人</span>
+                {{end}}
+                <button class="btn btn-primary" onclick="callAPI('/api/users{{if eq .UserMode "mws"}}?uids={{.User.Sub}}{{end}}')">查询用户</button>
+            </div>
+            <div id="api-result" class="result"></div>
+        </div>
+
+        <!-- 事件日志 -->
+        <div class="card">
+            <h2>最近事件（Webhook 接收）</h2>
+            {{if .Events}}
+            <table>
+                <thead>
+                    <tr>
+                        <th>事件类型</th>
+                        <th>事件 UUID</th>
+                        <th>已处理</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Events}}
+                    <tr>
+                        <td><span class="badge badge-blue">{{.EventType}}</span></td>
+                        <td style="font-family: monospace; font-size: 12px;">{{.EventUUID}}</td>
+                        <td>{{if .Processed}}<span class="badge badge-green">是</span>{{else}}<span class="badge badge-gray">否</span>{{end}}</td>
+                        <td>{{.CreatedAt.Format "01-02 15:04:05"}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="empty">暂无事件，等待 MWS365 推送...</div>
+            {{end}}
+            <div style="margin-top: 12px;">
+                <button class="btn btn-sm btn-primary" onclick="callAPI('/api/events')">刷新事件列表</button>
+            </div>
+        </div>
+
+        <!-- Webhook 配置提示 -->
+        <div class="card">
+            <h2>Webhook 配置</h2>
+            <p style="color: #888; font-size: 14px; margin-bottom: 8px;">请在 MWS365 应用配置中设置以下地址：</p>
+            <div style="background: #fafafa; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px;">
+                <div><strong>event_url:</strong> <span id="event-url"></span></div>
+                <div style="margin-top: 4px;"><strong>callback_url:</strong> <span id="callback-url"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 自动填充 webhook URL
+        const base = window.location.origin;
+        document.getElementById('event-url').textContent = base + '/webhook/events';
+        document.getElementById('callback-url').textContent = base + '/webhook/callbacks';
+
+        function callAPI(path) {
+            const resultEl = document.getElementById('api-result');
+            resultEl.style.display = 'block';
+            resultEl.textContent = '请求中...';
+
+            fetch(path)
+                .then(r => r.json())
+                .then(data => {
+                    resultEl.textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(err => {
+                    resultEl.textContent = '请求失败: ' + err.message;
+                });
+        }
+
+        function triggerSync() {
+            const resultEl = document.getElementById('api-result');
+            resultEl.style.display = 'block';
+            resultEl.textContent = '同步中...';
+
+            fetch('/api/sync', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    resultEl.textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(err => {
+                    resultEl.textContent = '请求失败: ' + err.message;
+                });
+        }
+    </script>
+</body>
+</html>
