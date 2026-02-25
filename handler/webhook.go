@@ -57,8 +57,9 @@ func (h *WebhookHandler) HandleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Webhook] 收到事件: type=%s, uuid=%s, tenant=%s",
-		payload.Metadata.EventType, payload.Metadata.EventUUID, payload.Metadata.TenantUUID)
+	log.Printf("[Webhook] 收到事件: type=%s, uuid=%s, tenant=%s, app=%s",
+		payload.Metadata.EventType, payload.Metadata.EventUUID,
+		payload.Metadata.TenantUUID, payload.Metadata.AppID)
 
 	// 事件落库 + 去重（INSERT IGNORE）
 	isNew, err := store.InsertEventLog(
@@ -70,7 +71,6 @@ func (h *WebhookHandler) HandleEvents(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		log.Printf("[Webhook] 事件落库失败: %v", err)
-		// 仍然返回 200，避免 MWS 重复推送
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -81,10 +81,8 @@ func (h *WebhookHandler) HandleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 模式 B：增量更新本地用户表
-	if h.userMode == "local" {
-		h.processUserEvent(payload.Metadata.EventType, body)
-	}
+	// 处理事件
+	h.processEvent(payload)
 
 	// 标记已处理
 	if err := store.MarkEventProcessed(payload.Metadata.EventUUID); err != nil {
@@ -94,27 +92,83 @@ func (h *WebhookHandler) HandleEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// processUserEvent 处理用户相关事件，更新本地 users 表
-func (h *WebhookHandler) processUserEvent(eventType string, rawBody []byte) {
+// processEvent 按事件类型分发处理
+func (h *WebhookHandler) processEvent(payload model.EventPayload) {
+	eventType := payload.Metadata.EventType
+
 	switch eventType {
+	// 用户事件
 	case "contact.user.create", "contact.user.update":
-		// 重新解析拿到 event 字段
-		var full struct {
-			Event model.EventUser `json:"event"`
-		}
-		if err := json.Unmarshal(rawBody, &full); err != nil {
+		var user model.ExternalEventUser
+		if err := json.Unmarshal(payload.Event, &user); err != nil {
 			log.Printf("[Webhook] 解析用户事件失败: %v", err)
 			return
 		}
-
-		if err := store.UpsertUserFromEvent(&full.Event); err != nil {
-			log.Printf("[Webhook] 更新本地用户失败: uid=%s, err=%v", full.Event.UnionUID, err)
-		} else {
-			log.Printf("[Webhook] 本地用户已更新: uid=%s, name=%s", full.Event.UnionUID, full.Event.Name)
+		log.Printf("[Webhook] 用户事件: type=%s, uid=%s, name=%s", eventType, user.UnionUID, user.Name)
+		if h.userMode == "local" {
+			if err := store.UpsertUserFromEvent(&user); err != nil {
+				log.Printf("[Webhook] 更新本地用户失败: uid=%s, err=%v", user.UnionUID, err)
+			} else {
+				log.Printf("[Webhook] 本地用户已更新: uid=%s", user.UnionUID)
+			}
 		}
+
+	// 群组事件
+	case "contact.group.create", "contact.group.update", "contact.group.delete":
+		var group model.EventContact
+		if err := json.Unmarshal(payload.Event, &group); err != nil {
+			log.Printf("[Webhook] 解析群组事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 群组事件: type=%s, uuid=%s, name=%s", eventType, group.Uuid, group.Name)
+
+	// 群组成员变更
+	case "contact.group.add_users", "contact.group.remove_users":
+		var group model.ExternalEventGroup
+		if err := json.Unmarshal(payload.Event, &group); err != nil {
+			log.Printf("[Webhook] 解析群组成员事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 群组成员事件: type=%s, group=%s, users=%v", eventType, group.GroupUuid, group.UserUnionUIDs)
+
+	// 部门事件
+	case "contact.department.create", "contact.department.update", "contact.department.delete":
+		var dept model.EventDepartment
+		if err := json.Unmarshal(payload.Event, &dept); err != nil {
+			log.Printf("[Webhook] 解析部门事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 部门事件: type=%s, uuid=%s, name=%s", eventType, dept.Uuid, dept.Name)
+
+	// 部门成员变更
+	case "contact.department.add_users", "contact.department.remove_users":
+		var dept model.ExternalEventDepartmentUsers
+		if err := json.Unmarshal(payload.Event, &dept); err != nil {
+			log.Printf("[Webhook] 解析部门成员事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 部门成员事件: type=%s, dept=%s, users=%v", eventType, dept.DepartmentUuid, dept.UserUnionUIDs)
+
+	// 角色成员变更
+	case "roles.add_users", "roles.remove_users":
+		var role model.ExternalEventRole
+		if err := json.Unmarshal(payload.Event, &role); err != nil {
+			log.Printf("[Webhook] 解析角色事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 角色事件: type=%s, role=%s, users=%v", eventType, role.RoleUuid, role.UserUnionUIDs)
+
+	// 应用更新
+	case "app.update":
+		var app model.EventAppUpdate
+		if err := json.Unmarshal(payload.Event, &app); err != nil {
+			log.Printf("[Webhook] 解析应用事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 应用事件: type=%s, app_id=%s, name=%s", eventType, app.AppID, app.AppName)
+
 	default:
-		// 其他事件类型仅记录日志
-		log.Printf("[Webhook] 事件 %s 已记录（不触发用户同步）", eventType)
+		log.Printf("[Webhook] 未知事件类型 %s，已记录", eventType)
 	}
 }
 
@@ -148,12 +202,23 @@ func (h *WebhookHandler) HandleCallbacks(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Printf("[Webhook] 收到回调: type=%s, uuid=%s",
-		payload.Metadata.CallbackType, payload.Metadata.CallbackUUID)
+	log.Printf("[Webhook] 收到回调: type=%s, uuid=%s, app=%s",
+		payload.Metadata.CallbackType, payload.Metadata.CallbackUUID, payload.Metadata.AppID)
 
-	// 回调需要返回响应内容
+	// 按回调类型处理
+	switch payload.Metadata.CallbackType {
+	case "notify.button.click":
+		var click model.CallbackNotificationButtonClick
+		if err := json.Unmarshal(payload.Callback, &click); err != nil {
+			log.Printf("[Webhook] 解析按钮回调失败: %v", err)
+		} else {
+			log.Printf("[Webhook] 按钮回调: msg=%s, button=%s, uid=%s",
+				click.MsgUuid, click.ButtonId, click.UnionUid)
+		}
+	default:
+		log.Printf("[Webhook] 未知回调类型: %s", payload.Metadata.CallbackType)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-	})
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

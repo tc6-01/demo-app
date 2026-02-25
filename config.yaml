@@ -9,16 +9,16 @@ mysql:
   dsn: "root:123456@tcp(127.0.0.1:3306)/mws365_demo?charset=utf8mb4&parseTime=true&loc=Local"
 
 mws:
-  base_url: "https://mws365.ru"
+  base_url: "https://uccp-dev.shimorelease.com"
 
 openapi:
-  app_id: "your-app-id"
-  app_secret: "your-app-secret"
-  tenant_uuid: "your-tenant-uuid"
-  encrypt_key: ""  # 可选，用于事件签名验证
+  app_id: "demo_742863b0b1ec721f"
+  app_secret: "530db785857c5f7332fc12bd162497d40a816a8d29c3f1ccc6acbadea7c2db53"
+  tenant_uuid: "990e8400-e29b-41d4-a716-446655440001"
+  encrypt_key: "8a0d78a8ea107c2354db528b216d075d"
 
 oauth2:
-  client_id: "your-client-id"
-  client_secret: "your-client-secret"
+  client_id: "demo_742863b0b1ec721f"
+  client_secret: "530db785857c5f7332fc12bd162497d40a816a8d29c3f1ccc6acbadea7c2db53"
   redirect_uri: "http://localhost:8080/oauth2/callback"
   scopes: "openid profile email"

@@ -78,6 +78,10 @@ func main() {
 	// API
 	mux.HandleFunc("/api/tenant-token", openapiHandler.HandleGetToken)
 	mux.HandleFunc("/api/users", openapiHandler.HandleGetUsers)
+	mux.HandleFunc("/api/departments", openapiHandler.HandleGetDepartments)
+	mux.HandleFunc("/api/groups", openapiHandler.HandleGetGroups)
+	mux.HandleFunc("/api/group-users", openapiHandler.HandleGetGroupUsers)
+	mux.HandleFunc("/api/role-members", openapiHandler.HandleGetRoleMembers)
 	mux.HandleFunc("/api/sync", openapiHandler.HandleSync)
 	mux.HandleFunc("/api/events", openapiHandler.HandleListEvents)
 

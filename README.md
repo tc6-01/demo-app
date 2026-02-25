@@ -1,118 +1,141 @@
 # MWS365 Demo App
 
-MWS365 OpenAPI + OAuth2 SSO 对接参考实现。
+MWS365 平台第三方应用接入参考实现，演示 OAuth2 SSO 登录、OpenAPI 调用、Webhook 事件接收的完整流程。
 
-模拟第三方应用对接 MWS365 的完整流程，包括：
-- **OAuth2 SSO 登录**：授权码流程、Token 刷新、登出
-- **OpenAPI 调用**：获取 tenant_access_token、查询通讯录用户
-- **事件 Webhook**：接收事件推送、签名验证、幂等去重
-- **用户同步**（可选）：全量拉取 + 事件增量更新
+## 功能
 
-## 快速开始
-
-### 1. 准备数据库
-
-```bash
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS mws365_demo DEFAULT CHARSET utf8mb4;"
-mysql -u root -p mws365_demo < schema.sql
-```
-
-### 2. 修改配置
-
-编辑 `config.yaml`，填入实际的凭证信息：
-
-```yaml
-mws:
-  base_url: "https://mws365.ru"       # MWS 服务地址
-
-openapi:
-  app_id: "your-app-id"               # 联系管理员获取
-  app_secret: "your-app-secret"
-  tenant_uuid: "your-tenant-uuid"
-  encrypt_key: ""                      # 可选，用于验证事件签名
-
-oauth2:
-  client_id: "your-client-id"          # 联系管理员获取
-  client_secret: "your-client-secret"
-  redirect_uri: "http://localhost:8080/oauth2/callback"
-```
-
-### 3. 启动
-
-```bash
-go run main.go
-
-# 启动时自动全量同步用户（仅 local 模式）
-go run main.go --sync
-
-# 指定配置文件
-go run main.go --config /path/to/config.yaml
-```
-
-### 4. 访问
-
-打开浏览器访问 http://localhost:8080
-
-## 两种用户模式
-
-通过 `config.yaml` 中 `app.user_mode` 配置：
-
-| 模式 | 值 | 说明 |
-|------|------|------|
-| 复用 MWS 用户 | `mws` | 不建本地用户表，用户信息实时调 OpenAPI 获取 |
-| 独立用户体系 | `local` | 本地维护 users 表，全量同步 + 事件增量更新 |
-
-## API 接口
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/` | 首页 |
-| GET | `/oauth2/login` | 发起 OAuth2 登录 |
-| GET | `/oauth2/callback` | OAuth2 回调 |
-| GET | `/oauth2/logout` | 登出 |
-| GET | `/oauth2/refresh` | 刷新 Token |
-| GET | `/dashboard` | 仪表盘 |
-| POST | `/webhook/events` | 事件接收端点 |
-| POST | `/webhook/callbacks` | 回调接收端点 |
-| GET | `/api/tenant-token` | 获取 tenant_access_token |
-| GET | `/api/users?uids=xx` | 查询用户（mws 模式需 uids 参数） |
-| POST | `/api/sync` | 全量同步用户（仅 local 模式） |
-| GET | `/api/events` | 查看事件日志 |
-
-## Webhook 配置
-
-在 MWS365 应用管理中配置：
-
-- **event_url**: `http://your-domain/webhook/events`
-- **callback_url**: `http://your-domain/webhook/callbacks`
-
-### 事件签名验证
-
-如果配置了 `encrypt_key`，MWS365 推送事件时会携带签名头：
-
-- `X-MWS-Request-Timestamp`: 时间戳
-- `X-MWS-Request-Nonce`: 随机字符串
-- `X-MWS-Signature`: 签名值
-
-签名算法：`SHA256(timestamp + nonce + encryptKey + body)`
+- **OAuth2 SSO 登录** — 授权码模式登录、Token 刷新、登出
+- **OpenAPI 调用** — 获取 tenant_access_token，查询用户/部门/群组/角色
+- **Webhook 事件接收** — 签名验证、事件去重、按类型分发处理
+- **回调接收** — 处理 MWS 平台回调推送（如通知按钮点击）
+- **用户全量同步** — local 模式下支持通过 OpenAPI 拉取全部用户到本地
 
 ## 项目结构
 
 ```
-├── main.go              # 入口
-├── config.yaml          # 配置
-├── schema.sql           # 建表脚本
+├── main.go                  # 入口，路由注册
+├── config.yaml              # 配置文件
+├── schema.sql               # 建表脚本
 ├── client/
-│   ├── openapi_client.go   # OpenAPI 客户端
-│   └── oauth_client.go     # OAuth2 客户端
+│   ├── oauth_client.go      # OAuth2 客户端（授权码交换、刷新、UserInfo）
+│   └── openapi_client.go    # OpenAPI 客户端（Token 管理、通讯录接口）
 ├── handler/
-│   ├── oauth.go         # OAuth2 登录处理
-│   ├── openapi.go       # OpenAPI 演示
-│   ├── webhook.go       # Webhook 接收
-│   └── page.go          # 页面渲染
-├── store/               # 数据库操作
-├── sync/                # 用户同步
-├── model/               # 类型定义
-├── signature/           # 签名验证
-└── templates/           # HTML 模板
+│   ├── oauth.go             # OAuth2 登录/回调/登出/刷新
+│   ├── openapi.go           # OpenAPI 操作 HTTP 接口
+│   ├── webhook.go           # Webhook 事件/回调处理
+│   └── page.go              # 页面渲染（首页、Dashboard）
+├── model/
+│   └── types.go             # 配置、请求/响应、事件模型定义
+├── store/
+│   ├── db.go                # 数据库初始化
+│   ├── user.go              # 本地用户 CRUD（local 模式）
+│   └── event_log.go         # 事件日志存储、去重
+├── signature/
+│   └── verify.go            # Webhook 签名验证
+├── sync/
+│   └── contact.go           # 用户全量同步
+├── templates/
+│   ├── index.html           # 首页
+│   └── dashboard.html       # Dashboard
+└── cmd/
+    └── setup/main.go        # 初始化工具（注册应用、插入 MWS 数据库记录）
 ```
+
+## 快速开始
+
+### 1. 准备配置
+
+复制并修改配置文件：
+
+```yaml
+server:
+  port: 8080
+  base_url: "http://localhost:8080"
+
+app:
+  user_mode: "mws"  # "mws" = 仅通过 OAuth2 认证, "local" = 同步用户到本地
+
+mysql:
+  dsn: "root:123456@tcp(127.0.0.1:3306)/mws365_demo?charset=utf8mb4&parseTime=true&loc=Local"
+
+mws:
+  base_url: "https://uccp-dev.shimorelease.com"
+
+openapi:
+  app_id: "your_app_id"
+  app_secret: "your_app_secret"
+  tenant_uuid: "your_tenant_uuid"
+  encrypt_key: "your_encrypt_key"
+
+oauth2:
+  client_id: "your_app_id"
+  client_secret: "your_app_secret"
+  redirect_uri: "http://localhost:8080/oauth2/callback"
+  scopes: "openid profile email"
+```
+
+### 2. 初始化数据库
+
+```bash
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS mws365_demo DEFAULT CHARSET utf8mb4"
+mysql -u root -p mws365_demo < schema.sql
+```
+
+### 3. 注册应用（可选）
+
+使用初始化工具自动在 MWS 数据库中注册应用：
+
+```bash
+go run cmd/setup/main.go --mws-dsn "root:123456@tcp(127.0.0.1:3306)/mws365" --tenant-id 1
+
+# 仅预览 SQL，不实际执行
+go run cmd/setup/main.go --dry-run
+```
+
+### 4. 启动
+
+```bash
+go run main.go
+```
+
+访问 `http://localhost:8080`，点击登录将跳转到 MWS 授权页面完成 OAuth2 认证。
+
+## 接入流程
+
+### OAuth2 SSO
+
+1. 用户访问 `/oauth2/login`，自动跳转到 MWS 授权页面
+2. 用户在 MWS 完成登录授权
+3. MWS 回调 `/oauth2/callback`，demo app 用授权码换取 Token 并获取 UserInfo
+4. 创建 Session，跳转到 Dashboard
+
+### OpenAPI
+
+1. 通过 `app_id` + `app_secret` + `tenant_uuid` 获取 `tenant_access_token`
+2. 携带 Token 调用通讯录接口：用户查询、部门查询、群组查询、角色查询
+3. Token 自动缓存，过期自动刷新，401 自动重试
+
+### Webhook
+
+1. 在 MWS 应用配置中设置 `event_url` 和 `callback_url`
+2. demo app 接收推送后进行签名验证（`encrypt_key`）
+3. 事件落库并去重（基于 `event_uuid`）
+4. 按事件类型分发处理
+
+## 支持的事件类型
+
+| 类型 | 事件 |
+|------|------|
+| 用户 | `contact.user.create`, `contact.user.update` |
+| 群组 | `contact.group.create`, `contact.group.update`, `contact.group.delete` |
+| 群组成员 | `contact.group.add_users`, `contact.group.remove_users` |
+| 部门 | `contact.department.create`, `contact.department.update`, `contact.department.delete` |
+| 部门成员 | `contact.department.add_users`, `contact.department.remove_users` |
+| 角色 | `roles.add_users`, `roles.remove_users` |
+| 应用 | `app.update` |
+| 回调 | `notify.button.click` |
+
+## 用户模式
+
+- **mws 模式**（默认）：通过 OAuth2 SSO 认证，不本地存储用户数据
+- **local 模式**：通过 OpenAPI 全量同步用户到本地 `users` 表，支持增量事件更新

@@ -55,7 +55,7 @@ func (h *PageHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 func (h *PageHandler) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 	sess := h.oauthHandler.GetCurrentSession(r)
 	if sess == nil {
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, "/oauth2/login", http.StatusFound)
 		return
 	}
 

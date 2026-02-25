@@ -1,6 +1,8 @@
 module mws365-demo-app
 
-go 1.22
+go 1.24.0
+
+toolchain go1.24.5
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3

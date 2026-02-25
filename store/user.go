@@ -25,7 +25,7 @@ func UpsertUser(u *model.OpenAPIUser) error {
 }
 
 // UpsertUserFromEvent 从事件数据更新用户
-func UpsertUserFromEvent(u *model.EventUser) error {
+func UpsertUserFromEvent(u *model.ExternalEventUser) error {
 	_, err := DB.Exec(
 		`INSERT INTO users (union_uid, name, nickname, email, mobile, avatar, status, synced_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())

@@ -8,7 +8,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// DB 全局数据库连接
+// DB 全局数据库连接（demo app 自身）
 var DB *sql.DB
 
 // InitDB 初始化 MySQL 连接

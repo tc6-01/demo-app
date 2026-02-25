@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // ==================== 配置 ====================
 
@@ -55,10 +58,23 @@ type TenantTokenReq struct {
 
 // TenantTokenResp 获取 tenant_access_token 响应
 type TenantTokenResp struct {
-	Code              int    `json:"code"`
-	Msg               string `json:"msg"`
-	TenantAccessToken string `json:"tenant_access_token"`
-	ExpiresIn         int64  `json:"expires_in"` // 毫秒
+	Code any    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		TenantAccessToken string `json:"tenant_access_token"`
+		ExpiresIn         int64  `json:"expires_in"` // 毫秒
+	} `json:"data"`
+}
+
+// IsOK 检查响应是否成功
+func (r *TenantTokenResp) IsOK() bool {
+	switch v := r.Code.(type) {
+	case float64:
+		return v == 0
+	case string:
+		return v == "OK" || v == "0"
+	}
+	return false
 }
 
 // OpenAPIUser OpenAPI 返回的用户结构
@@ -78,7 +94,7 @@ type OpenAPIUser struct {
 
 // BatchGetUsersResp 批量获取用户响应
 type BatchGetUsersResp struct {
-	Code int    `json:"code"`
+	Code any    `json:"code"`
 	Msg  string `json:"msg"`
 	Data struct {
 		HasMore   bool          `json:"has_more"`
@@ -124,9 +140,9 @@ type Session struct {
 
 // EventPayload MWS365 推送的事件载荷（schema 2.0）
 type EventPayload struct {
-	Schema   string        `json:"schema"`
-	Metadata EventMetadata `json:"metadata"`
-	Event    any           `json:"event"`
+	Schema   string          `json:"schema"`
+	Metadata EventMetadata   `json:"metadata"`
+	Event    json.RawMessage `json:"event"`
 }
 
 // EventMetadata 事件元数据
@@ -136,11 +152,11 @@ type EventMetadata struct {
 	CreatedAt  int64  `json:"created_at"`
 	EventType  string `json:"event_type"`
 	TenantUUID string `json:"tenant_uuid"`
-	AppID      string `json:"app_id"`
+	AppID      string `json:"app_id,omitempty"`
 }
 
-// EventUser 用户事件载荷（contact.user.create/update）
-type EventUser struct {
+// ExternalEventUser 用户事件载荷（contact.user.create/update）
+type ExternalEventUser struct {
 	UnionUID   string `json:"union_uid"`
 	Name       string `json:"name"`
 	FirstName  string `json:"first_name,omitempty"`
@@ -154,22 +170,81 @@ type EventUser struct {
 	IsExternal bool   `json:"is_external"`
 }
 
+// EventContact 群组事件载荷（contact.group.create/update/delete）
+type EventContact struct {
+	Uuid        string `json:"uuid,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Type        uint   `json:"type,omitempty"`
+	IsPublic    int8   `json:"is_public,omitempty"`
+	UserCount   uint   `json:"user_count,omitempty"`
+	Avatar      string `json:"avatar,omitempty"`
+	Status      int8   `json:"status,omitempty"`
+}
+
+// EventDepartment 部门事件载荷（contact.department.create/update/delete）
+type EventDepartment struct {
+	Uuid        string `json:"uuid,omitempty"`
+	ParentUuid  string `json:"parent_uuid,omitempty"`
+	Name        string `json:"name,omitempty"`
+	SortOrder   uint   `json:"sort_order,omitempty"`
+	MemberCount uint   `json:"member_count,omitempty"`
+	Status      int8   `json:"status,omitempty"`
+}
+
+// ExternalEventGroup 群组用户变更事件载荷（contact.group.add_users/remove_users）
+type ExternalEventGroup struct {
+	GroupUuid     string   `json:"group_uuid"`
+	UserUnionUIDs []string `json:"user_union_uids"`
+}
+
+// ExternalEventDepartmentUsers 部门用户变更事件载荷（contact.department.add_users/remove_users）
+type ExternalEventDepartmentUsers struct {
+	DepartmentUuid string   `json:"department_uuid"`
+	UserUnionUIDs  []string `json:"user_union_uids"`
+}
+
+// ExternalEventRole 角色用户变更事件载荷（roles.add_users/remove_users）
+type ExternalEventRole struct {
+	RoleUuid      string   `json:"role_uuid"`
+	RoleType      int      `json:"role_type"`
+	UserUnionUIDs []string `json:"user_union_uids"`
+}
+
+// EventAppUpdate 应用更新事件载荷（app.update）
+type EventAppUpdate struct {
+	AppID        string `json:"app_id"`
+	AppName      string `json:"app_name,omitempty"`
+	AppDesc      string `json:"app_desc,omitempty"`
+	Status       *int32 `json:"status,omitempty"`
+	VisibleToAll *bool  `json:"visible_to_all,omitempty"`
+}
+
 // ==================== 回调 ====================
 
 // CallbackPayload MWS365 推送的回调载荷
 type CallbackPayload struct {
 	Schema   string           `json:"schema"`
 	Metadata CallbackMetadata `json:"metadata"`
-	Callback any              `json:"callback"`
+	Callback json.RawMessage  `json:"callback"`
 }
 
 // CallbackMetadata 回调元数据
 type CallbackMetadata struct {
 	CallbackUUID string `json:"callback_uuid"`
+	Token        string `json:"token"`
+	CreatedAt    int64  `json:"created_at"`
 	CallbackType string `json:"callback_type"`
-	CreateTime   int64  `json:"create_time"`
 	TenantUUID   string `json:"tenant_uuid"`
 	AppID        string `json:"app_id"`
+}
+
+// CallbackNotificationButtonClick 通知按钮点击回调载荷
+type CallbackNotificationButtonClick struct {
+	MsgUuid             string `json:"msg_uuid"`
+	ButtonId            string `json:"button_id"`
+	ButtonActionPayload string `json:"button_action_payload"`
+	UnionUid            string `json:"union_uid"`
 }
 
 // ==================== 数据库模型 ====================

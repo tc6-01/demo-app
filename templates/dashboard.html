@@ -66,14 +66,42 @@
         <!-- OpenAPI 操作 -->
         <div class="card">
             <h2>OpenAPI 操作</h2>
+
+            <h3 style="font-size:14px; color:#888; margin-bottom:8px;">认证</h3>
             <div class="actions">
                 <button class="btn btn-primary" onclick="callAPI('/api/tenant-token')">获取 Tenant Token</button>
+            </div>
+
+            <h3 style="font-size:14px; color:#888; margin:12px 0 8px;">通讯录 - 用户</h3>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="callAPI('/api/users')">查询全部用户</button>
+                <input type="text" id="user-uids" placeholder="union_uid（多个用逗号分隔）" value="{{.User.Sub}}" style="padding:6px 12px; border:1px solid #d9d9d9; border-radius:6px; font-size:13px; width:320px;">
+                <button class="btn btn-primary" onclick="queryUsersByUID()">按 UID 查询</button>
                 {{if eq .UserMode "local"}}
                 <button class="btn btn-success" onclick="triggerSync()">全量同步用户</button>
                 <span style="line-height: 36px; color: #888;">本地用户: <span class="stat" style="font-size: 18px;">{{.UserCount}}</span> 人</span>
                 {{end}}
-                <button class="btn btn-primary" onclick="callAPI('/api/users{{if eq .UserMode "mws"}}?uids={{.User.Sub}}{{end}}')">查询用户</button>
             </div>
+
+            <h3 style="font-size:14px; color:#888; margin:12px 0 8px;">通讯录 - 部门</h3>
+            <div class="actions">
+                <input type="text" id="dept-uuid" placeholder="department_uuid（默认根部门 0）" style="padding:6px 12px; border:1px solid #d9d9d9; border-radius:6px; font-size:13px; width:280px;">
+                <button class="btn btn-primary" onclick="queryDepartments()">查询子部门</button>
+            </div>
+
+            <h3 style="font-size:14px; color:#888; margin:12px 0 8px;">通讯录 - 群组</h3>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="callAPI('/api/groups')">查询群组列表</button>
+                <input type="text" id="group-uuid" placeholder="group_uuid" style="padding:6px 12px; border:1px solid #d9d9d9; border-radius:6px; font-size:13px; width:220px;">
+                <button class="btn btn-primary" onclick="queryGroupUsers()">查询群组成员</button>
+            </div>
+
+            <h3 style="font-size:14px; color:#888; margin:12px 0 8px;">通讯录 - 角色</h3>
+            <div class="actions">
+                <input type="text" id="role-uuid" placeholder="role_uuid" style="padding:6px 12px; border:1px solid #d9d9d9; border-radius:6px; font-size:13px; width:220px;">
+                <button class="btn btn-primary" onclick="queryRoleMembers()">查询角色成员</button>
+            </div>
+
             <div id="api-result" class="result"></div>
         </div>
 
@@ -154,6 +182,31 @@
                 .catch(err => {
                     resultEl.textContent = '请求失败: ' + err.message;
                 });
+        }
+
+        function queryUsersByUID() {
+            const input = document.getElementById('user-uids').value.trim();
+            if (!input) { callAPI('/api/users'); return; }
+            const uids = input.split(',').map(s => s.trim()).filter(Boolean);
+            const params = uids.map(u => 'uids=' + encodeURIComponent(u)).join('&');
+            callAPI('/api/users?' + params);
+        }
+
+        function queryDepartments() {
+            const uuid = document.getElementById('dept-uuid').value || '0';
+            callAPI('/api/departments?department_uuid=' + encodeURIComponent(uuid));
+        }
+
+        function queryGroupUsers() {
+            const uuid = document.getElementById('group-uuid').value;
+            if (!uuid) { alert('请输入 group_uuid'); return; }
+            callAPI('/api/group-users?group_uuid=' + encodeURIComponent(uuid));
+        }
+
+        function queryRoleMembers() {
+            const uuid = document.getElementById('role-uuid').value;
+            if (!uuid) { alert('请输入 role_uuid'); return; }
+            callAPI('/api/role-members?role_uuid=' + encodeURIComponent(uuid));
         }
     </script>
 </body>

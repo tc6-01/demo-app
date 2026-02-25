@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS event_logs (
 -- 模式 B 额外表：本地用户（仅 user_mode=local 时需要）
 CREATE TABLE IF NOT EXISTS users (
     id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    union_uid   VARCHAR(64)  NOT NULL COMMENT '用户唯一标识，格式 uu_xxx',
+    union_uid   VARCHAR(64)  NOT NULL COMMENT '用户 union_uid',
     name        VARCHAR(128) NOT NULL DEFAULT '' COMMENT '姓名',
     nickname    VARCHAR(128) NOT NULL DEFAULT '' COMMENT '昵称',
     email       VARCHAR(256) NOT NULL DEFAULT '' COMMENT '邮箱',
