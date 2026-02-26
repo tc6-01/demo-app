@@ -72,9 +72,17 @@ func (c *OAuth2Client) ExchangeCode(code string) (*model.OAuth2TokenResp, error)
 	}
 
 	var tokenResp model.OAuth2TokenResp
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
+	// 兼容包装格式 {"code":"OK","data":{...}} 和标准格式 {"access_token":...}
+	var wrapper struct {
+		Code string               `json:"code"`
+		Data model.OAuth2TokenResp `json:"data"`
+	}
+	if err := json.Unmarshal(body, &wrapper); err == nil && wrapper.Code != "" && wrapper.Data.AccessToken != "" {
+		tokenResp = wrapper.Data
+	} else if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return nil, fmt.Errorf("解析 token 响应失败: %w", err)
 	}
+
 	return &tokenResp, nil
 }
 
@@ -102,14 +110,21 @@ func (c *OAuth2Client) RefreshToken(refreshToken string) (*model.OAuth2TokenResp
 	}
 
 	var tokenResp model.OAuth2TokenResp
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
+	var wrapper struct {
+		Code string               `json:"code"`
+		Data model.OAuth2TokenResp `json:"data"`
+	}
+	if err := json.Unmarshal(body, &wrapper); err == nil && wrapper.Code != "" && wrapper.Data.AccessToken != "" {
+		tokenResp = wrapper.Data
+	} else if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return nil, fmt.Errorf("解析刷新 token 响应失败: %w", err)
 	}
 	return &tokenResp, nil
 }
 
 func (c *OAuth2Client) GetUserInfo(accessToken string) (*model.OAuth2UserInfo, error) {
-	req, _ := http.NewRequest(http.MethodGet, c.baseURL+"/oauth2/userinfo", nil)
+	userInfoURL := c.baseURL + "/oauth2/userinfo"
+	req, _ := http.NewRequest(http.MethodGet, userInfoURL, nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
@@ -124,7 +139,13 @@ func (c *OAuth2Client) GetUserInfo(accessToken string) (*model.OAuth2UserInfo, e
 	}
 
 	var userInfo model.OAuth2UserInfo
-	if err := json.Unmarshal(body, &userInfo); err != nil {
+	var wrapper struct {
+		Code string              `json:"code"`
+		Data model.OAuth2UserInfo `json:"data"`
+	}
+	if err := json.Unmarshal(body, &wrapper); err == nil && wrapper.Code != "" && wrapper.Data.Sub != "" {
+		userInfo = wrapper.Data
+	} else if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("解析用户信息失败: %w", err)
 	}
 	return &userInfo, nil

@@ -79,5 +79,6 @@ func (h *PageHandler) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 		"Session":   sess,
 	}
 
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	h.templates.ExecuteTemplate(w, "dashboard.html", data)
 }

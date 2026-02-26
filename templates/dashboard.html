@@ -108,32 +108,34 @@
         <!-- 事件日志 -->
         <div class="card">
             <h2>最近事件（Webhook 接收）</h2>
-            {{if .Events}}
-            <table>
-                <thead>
-                    <tr>
-                        <th>事件类型</th>
-                        <th>事件 UUID</th>
-                        <th>已处理</th>
-                        <th>时间</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Events}}
-                    <tr>
-                        <td><span class="badge badge-blue">{{.EventType}}</span></td>
-                        <td style="font-family: monospace; font-size: 12px;">{{.EventUUID}}</td>
-                        <td>{{if .Processed}}<span class="badge badge-green">是</span>{{else}}<span class="badge badge-gray">否</span>{{end}}</td>
-                        <td>{{.CreatedAt.Format "01-02 15:04:05"}}</td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
-            {{else}}
-            <div class="empty">暂无事件，等待 MWS365 推送...</div>
-            {{end}}
+            <div id="events-container">
+                {{if .Events}}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>事件类型</th>
+                            <th>事件 UUID</th>
+                            <th>已处理</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Events}}
+                        <tr>
+                            <td><span class="badge badge-blue">{{.EventType}}</span></td>
+                            <td style="font-family: monospace; font-size: 12px;">{{.EventUUID}}</td>
+                            <td>{{if .Processed}}<span class="badge badge-green">是</span>{{else}}<span class="badge badge-gray">否</span>{{end}}</td>
+                            <td>{{.CreatedAt.Format "01-02 15:04:05"}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{else}}
+                <div class="empty">暂无事件，等待 MWS365 推送...</div>
+                {{end}}
+            </div>
             <div style="margin-top: 12px;">
-                <button class="btn btn-sm btn-primary" onclick="callAPI('/api/events')">刷新事件列表</button>
+                <button class="btn btn-sm btn-primary" onclick="refreshEvents()">刷新事件列表</button>
             </div>
         </div>
 
@@ -207,6 +209,36 @@
             const uuid = document.getElementById('role-uuid').value;
             if (!uuid) { alert('请输入 role_uuid'); return; }
             callAPI('/api/role-members?role_uuid=' + encodeURIComponent(uuid));
+        }
+
+        function refreshEvents() {
+            const container = document.getElementById('events-container');
+            container.innerHTML = '<div class="empty">加载中...</div>';
+
+            fetch('/api/events')
+                .then(r => r.json())
+                .then(resp => {
+                    const events = resp.data || [];
+                    if (!events.length) {
+                        container.innerHTML = '<div class="empty">暂无事件，等待 MWS365 推送...</div>';
+                        return;
+                    }
+                    let html = '<table><thead><tr><th>事件类型</th><th>事件 UUID</th><th>已处理</th><th>时间</th></tr></thead><tbody>';
+                    events.forEach(e => {
+                        const t = new Date(e.created_at);
+                        const ts = String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0') + ' ' + String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0') + ':' + String(t.getSeconds()).padStart(2,'0');
+                        const processed = e.processed ? '<span class="badge badge-green">是</span>' : '<span class="badge badge-gray">否</span>';
+                        html += '<tr><td><span class="badge badge-blue">' + e.event_type + '</span></td>';
+                        html += '<td style="font-family:monospace;font-size:12px;">' + e.event_uuid + '</td>';
+                        html += '<td>' + processed + '</td>';
+                        html += '<td>' + ts + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    container.innerHTML = '<div class="empty">加载失败: ' + err.message + '</div>';
+                });
         }
     </script>
 </body>
