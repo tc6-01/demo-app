@@ -142,7 +142,11 @@ func (h *OAuthHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 func (h *OAuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	sessionID := getSessionID(r)
+	var refreshToken string
 	if sessionID != "" {
+		if sess := h.sessions.GetSession(sessionID); sess != nil {
+			refreshToken = sess.RefreshToken
+		}
 		h.sessions.DeleteSession(sessionID)
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -151,7 +155,9 @@ func (h *OAuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 		Path:   "/",
 		MaxAge: -1,
 	})
-	http.Redirect(w, r, "/", http.StatusFound)
+
+	logoutURL := h.oauth2Client.BuildLogoutURL(h.baseURL+"/", refreshToken)
+	http.Redirect(w, r, logoutURL, http.StatusFound)
 }
 
 func (h *OAuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {

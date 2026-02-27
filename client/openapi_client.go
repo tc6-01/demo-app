@@ -173,10 +173,10 @@ func (c *OpenAPIClient) GetDepartmentChildren(departmentUUID string, params map[
 
 // GetGroupUsers 获取群组成员
 func (c *OpenAPIClient) GetGroupUsers(groupUUID string, params map[string]string) (json.RawMessage, error) {
-	path := "/openapi/v1/contact/groups/" + groupUUID + "/users?"
+	path := "/openapi/v1/contact/groups/" + groupUUID + "/users?uid_type=union_uid"
 	for k, v := range params {
 		if v != "" {
-			path += k + "=" + v + "&"
+			path += "&" + k + "=" + v
 		}
 	}
 	return c.CallAPI(http.MethodGet, path, nil)
