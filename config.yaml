@@ -1,6 +1,6 @@
 server:
-  port: 8080
-  base_url: "http://172.16.22.63:8080"
+  port: 8082
+  base_url: "http://172.16.23.100:8082"
 
 app:
   user_mode: "mws"  # "mws" = 直接复用 MWS 用户, "local" = 本地 users 表
@@ -20,5 +20,5 @@ openapi:
 oauth2:
   client_id: "demo_742863b0b1ec721f"
   client_secret: "530db785857c5f7332fc12bd162497d40a816a8d29c3f1ccc6acbadea7c2db53"
-  redirect_uri: "http://172.16.22.63:8080/oauth2/callback"
+  redirect_uri: "http://172.16.23.100:8082/oauth2/callback"
   scopes: "openid profile email"

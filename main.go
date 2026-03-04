@@ -75,13 +75,25 @@ func main() {
 	mux.HandleFunc("/webhook/events", webhookHandler.HandleEvents)
 	mux.HandleFunc("/webhook/callbacks", webhookHandler.HandleCallbacks)
 
-	// API
+	// API - 认证
 	mux.HandleFunc("/api/tenant-token", openapiHandler.HandleGetToken)
+	
+	// API - 通讯录
 	mux.HandleFunc("/api/users", openapiHandler.HandleGetUsers)
 	mux.HandleFunc("/api/departments", openapiHandler.HandleGetDepartments)
 	mux.HandleFunc("/api/groups", openapiHandler.HandleGetGroups)
 	mux.HandleFunc("/api/group-users", openapiHandler.HandleGetGroupUsers)
 	mux.HandleFunc("/api/role-members", openapiHandler.HandleGetRoleMembers)
+	
+	// API - 全量接口（大分页）
+	mux.HandleFunc("/api/all-users", openapiHandler.HandleGetAllUsers)
+	mux.HandleFunc("/api/all-departments", openapiHandler.HandleGetAllDepartments)
+	
+	// API - 应用与租户
+	mux.HandleFunc("/api/tenant-info", openapiHandler.HandleGetTenantInfo)
+	mux.HandleFunc("/api/visibility-users", openapiHandler.HandleGetVisibilityUsers)
+	
+	// API - 同步与事件
 	mux.HandleFunc("/api/sync", openapiHandler.HandleSync)
 	mux.HandleFunc("/api/events", openapiHandler.HandleListEvents)
 

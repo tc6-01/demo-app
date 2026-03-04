@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 
 	"mws365-demo-app/model"
@@ -20,10 +19,6 @@ type OpenAPIClient struct {
 	appSecret  string
 	tenantUUID string
 	httpClient *http.Client
-
-	mu          sync.Mutex
-	cachedToken string
-	tokenExpiry time.Time
 }
 
 func NewOpenAPIClient(cfg *model.Config) *OpenAPIClient {
@@ -36,15 +31,8 @@ func NewOpenAPIClient(cfg *model.Config) *OpenAPIClient {
 	}
 }
 
-// GetTenantAccessToken 获取 tenant_access_token（带缓存）
+// GetTenantAccessToken 获取 tenant_access_token（每次都调用接口）
 func (c *OpenAPIClient) GetTenantAccessToken() (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.cachedToken != "" && time.Now().Add(5*time.Minute).Before(c.tokenExpiry) {
-		return c.cachedToken, nil
-	}
-
 	log.Println("[OpenAPI] 获取 tenant_access_token...")
 
 	reqBody := model.TenantTokenReq{
@@ -74,11 +62,8 @@ func (c *OpenAPIClient) GetTenantAccessToken() (string, error) {
 		return "", fmt.Errorf("获取失败: code=%v, msg=%s", tokenResp.Code, tokenResp.Msg)
 	}
 
-	c.cachedToken = tokenResp.Data.TenantAccessToken
-	c.tokenExpiry = time.Now().Add(time.Duration(tokenResp.Data.ExpiresIn) * time.Millisecond)
-
-	log.Printf("[OpenAPI] tenant_access_token 获取成功，过期时间: %s", c.tokenExpiry.Format(time.RFC3339))
-	return c.cachedToken, nil
+	log.Printf("[OpenAPI] tenant_access_token 获取成功，expires_in: %d ms", tokenResp.Data.ExpiresIn)
+	return tokenResp.Data.TenantAccessToken, nil
 }
 
 // CallAPI 通用 API 调用（自动携带 tenant_access_token，401 自动重试）
@@ -111,11 +96,7 @@ func (c *OpenAPIClient) CallAPI(method, path string, reqBody any) ([]byte, error
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		log.Println("[OpenAPI] 收到 401，清除缓存重试")
-		c.mu.Lock()
-		c.cachedToken = ""
-		c.tokenExpiry = time.Time{}
-		c.mu.Unlock()
+		log.Println("[OpenAPI] 收到 401，重新获取 token 并重试")
 
 		token, err = c.GetTenantAccessToken()
 		if err != nil {
@@ -198,18 +179,58 @@ func (c *OpenAPIClient) GetRoleMembers(roleUUID string, params map[string]string
 	return c.CallAPI(http.MethodGet, path, nil)
 }
 
-// ListAllUsers 分页获取所有用户（用于全量同步）
+// GetAllUsers 获取所有用户（大分页，用于全量同步优化）
+// GET /openapi/v1/contact/all_users?page_size=500
+func (c *OpenAPIClient) GetAllUsers(pageSize int, pageToken string) (json.RawMessage, error) {
+	if pageSize <= 0 {
+		pageSize = 500
+	}
+	if pageSize > 500 {
+		pageSize = 500
+	}
+	path := fmt.Sprintf("/openapi/v1/contact/all_users?page_size=%d", pageSize)
+	if pageToken != "" {
+		path += "&page_token=" + pageToken
+	}
+	return c.CallAPI(http.MethodGet, path, nil)
+}
+
+// GetAllDepartments 获取所有部门（大分页）
+// GET /openapi/v1/contact/all_departments?page_size=500
+func (c *OpenAPIClient) GetAllDepartments(pageSize int, pageToken string) (json.RawMessage, error) {
+	if pageSize <= 0 {
+		pageSize = 500
+	}
+	if pageSize > 500 {
+		pageSize = 500
+	}
+	path := fmt.Sprintf("/openapi/v1/contact/all_departments?page_size=%d", pageSize)
+	if pageToken != "" {
+		path += "&page_token=" + pageToken
+	}
+	return c.CallAPI(http.MethodGet, path, nil)
+}
+
+// GetTenantInfo 获取租户完整信息（应用、AI配置、License）
+// GET /openapi/v1/app/tenant
+func (c *OpenAPIClient) GetTenantInfo() (json.RawMessage, error) {
+	return c.CallAPI(http.MethodGet, "/openapi/v1/app/tenant", nil)
+}
+
+// GetVisibilityUsers 获取应用可见性用户列表
+// GET /openapi/v1/app/visibility/users
+func (c *OpenAPIClient) GetVisibilityUsers() (json.RawMessage, error) {
+	return c.CallAPI(http.MethodGet, "/openapi/v1/app/visibility/users", nil)
+}
+
+// ListAllUsers 分页获取所有用户（用于全量同步，使用大分页接口优化）
 func (c *OpenAPIClient) ListAllUsers(pageSize int) ([]model.OpenAPIUser, error) {
 	var allUsers []model.OpenAPIUser
 	pageToken := ""
 
 	for {
-		path := fmt.Sprintf("/openapi/v1/contact/users?uid_type=union_uid&page_size=%d", pageSize)
-		if pageToken != "" {
-			path += "&page_token=" + pageToken
-		}
-
-		body, err := c.CallAPI(http.MethodGet, path, nil)
+		// 使用新的 all_users 接口，默认 500 条/页
+		body, err := c.GetAllUsers(pageSize, pageToken)
 		if err != nil {
 			return nil, err
 		}

@@ -146,6 +146,56 @@ func (h *OpenAPIHandler) HandleListEvents(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, model.APIResponse{Code: 0, Msg: "success", Data: events})
 }
 
+// HandleGetTenantInfo 获取租户完整信息（应用、AI配置、License）
+func (h *OpenAPIHandler) HandleGetTenantInfo(w http.ResponseWriter, r *http.Request) {
+	body, err := h.apiClient.GetTenantInfo()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, model.APIResponse{Code: -1, Msg: "获取租户信息失败: " + err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(body)
+}
+
+// HandleGetVisibilityUsers 获取应用可见性用户列表
+func (h *OpenAPIHandler) HandleGetVisibilityUsers(w http.ResponseWriter, r *http.Request) {
+	body, err := h.apiClient.GetVisibilityUsers()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, model.APIResponse{Code: -1, Msg: "获取可见性用户失败: " + err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(body)
+}
+
+// HandleGetAllUsers 获取所有用户（大分页）
+func (h *OpenAPIHandler) HandleGetAllUsers(w http.ResponseWriter, r *http.Request) {
+	pageSize := 500
+	pageToken := r.URL.Query().Get("page_token")
+	
+	body, err := h.apiClient.GetAllUsers(pageSize, pageToken)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, model.APIResponse{Code: -1, Msg: "查询所有用户失败: " + err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(body)
+}
+
+// HandleGetAllDepartments 获取所有部门（大分页）
+func (h *OpenAPIHandler) HandleGetAllDepartments(w http.ResponseWriter, r *http.Request) {
+	pageSize := 500
+	pageToken := r.URL.Query().Get("page_token")
+	
+	body, err := h.apiClient.GetAllDepartments(pageSize, pageToken)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, model.APIResponse{Code: -1, Msg: "查询所有部门失败: " + err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(body)
+}
+
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

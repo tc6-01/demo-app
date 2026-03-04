@@ -158,14 +158,56 @@ func (h *WebhookHandler) processEvent(payload model.EventPayload) {
 		}
 		log.Printf("[Webhook] 角色事件: type=%s, role=%s, users=%v", eventType, role.RoleUuid, role.UserUnionUIDs)
 
-	// 应用更新
+	// 应用生命周期事件
 	case "app.update":
 		var app model.EventAppUpdate
 		if err := json.Unmarshal(payload.Event, &app); err != nil {
-			log.Printf("[Webhook] 解析应用事件失败: %v", err)
+			log.Printf("[Webhook] 解析应用更新事件失败: %v", err)
 			return
 		}
-		log.Printf("[Webhook] 应用事件: type=%s, app_id=%s, name=%s", eventType, app.AppID, app.AppName)
+		log.Printf("[Webhook] 应用更新事件: app_id=%s, name=%s", app.AppID, app.AppName)
+
+	case "app.install":
+		var app model.EventAppInstall
+		if err := json.Unmarshal(payload.Event, &app); err != nil {
+			log.Printf("[Webhook] 解析应用安装事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 应用安装事件: app_id=%s, name=%s", app.AppID, app.AppName)
+
+	case "app.uninstall":
+		var app model.EventAppUninstall
+		if err := json.Unmarshal(payload.Event, &app); err != nil {
+			log.Printf("[Webhook] 解析应用卸载事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 应用卸载事件: app_id=%s, name=%s", app.AppID, app.AppName)
+
+	// 应用可见性事件
+	case "app.visibility.add_users":
+		var visibility model.EventAppVisibilityUsers
+		if err := json.Unmarshal(payload.Event, &visibility); err != nil {
+			log.Printf("[Webhook] 解析应用可见性添加事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 应用可见性添加用户: users=%v (%d个)", visibility.UserUnionUIDs, len(visibility.UserUnionUIDs))
+
+	case "app.visibility.remove_users":
+		var visibility model.EventAppVisibilityUsers
+		if err := json.Unmarshal(payload.Event, &visibility); err != nil {
+			log.Printf("[Webhook] 解析应用可见性移除事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 应用可见性移除用户: users=%v (%d个)", visibility.UserUnionUIDs, len(visibility.UserUnionUIDs))
+
+	// 租户配置更新事件
+	case "tenant.config.update":
+		var config model.EventTenantConfigUpdate
+		if err := json.Unmarshal(payload.Event, &config); err != nil {
+			log.Printf("[Webhook] 解析租户配置更新事件失败: %v", err)
+			return
+		}
+		log.Printf("[Webhook] 租户配置更新: key=%s", config.ConfigKey)
 
 	default:
 		log.Printf("[Webhook] 未知事件类型 %s，已记录", eventType)

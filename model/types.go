@@ -103,6 +103,70 @@ type BatchGetUsersResp struct {
 	} `json:"data"`
 }
 
+// OpenAPIDepartment OpenAPI 返回的部门结构
+type OpenAPIDepartment struct {
+	UUID        string `json:"uuid"`
+	ParentUUID  string `json:"parent_uuid"`
+	Name        string `json:"name"`
+	SortOrder   int    `json:"sort_order"`
+	MemberCount int    `json:"member_count"`
+	Status      int8   `json:"status"`
+}
+
+// TenantInfoResp 获取租户信息响应
+type TenantInfoResp struct {
+	Code any    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		TenantUUID string            `json:"tenant_uuid"`
+		TenantName string            `json:"tenant_name"`
+		App        *TenantAppItem    `json:"app"`
+		AIConfig   *TenantAIConfig   `json:"ai_config"`
+		License    *TenantLicenseItem `json:"license"`
+	} `json:"data"`
+}
+
+// TenantAppItem 租户安装的应用信息
+type TenantAppItem struct {
+	AppID       string `json:"app_id"`
+	AppName     string `json:"app_name"`
+	AppDesc     string `json:"app_desc"`
+	Status      int8   `json:"status"`
+	IconURL     string `json:"icon_url"`
+	InstalledAt int64  `json:"installed_at"`
+}
+
+// TenantAIConfig 租户 AI 配置
+type TenantAIConfig struct {
+	Model          string `json:"model"`
+	BaseURL        string `json:"base_url"`
+	APIKey         string `json:"api_key"`
+	OutputMaxToken int64  `json:"output_max_token"`
+}
+
+// TenantLicenseItem 租户 License 信息
+type TenantLicenseItem struct {
+	UUID           string           `json:"uuid"`
+	LicenseName    string           `json:"license_name"`
+	TenantUUID     string           `json:"tenant_uuid"`
+	AdminEmail     string           `json:"admin_email"`
+	DeploymentType int32            `json:"deployment_type"`
+	LicenseType    string           `json:"license_type"`
+	IssuedAt       int64            `json:"issued_at"`
+	ValidFrom      int64            `json:"valid_from"`
+	ValidTo        int64            `json:"valid_to"`
+	AppSeatMap     map[string]int32 `json:"app_seat_map"`
+}
+
+// VisibilityUsersResp 应用可见性用户列表响应
+type VisibilityUsersResp struct {
+	Code any    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		UserUnionUIDs []string `json:"user_union_uids"`
+	} `json:"data"`
+}
+
 // ==================== OAuth2 ====================
 
 // OAuth2TokenResp OAuth2 token 响应
@@ -213,11 +277,32 @@ type ExternalEventRole struct {
 
 // EventAppUpdate 应用更新事件载荷（app.update）
 type EventAppUpdate struct {
-	AppID        string `json:"app_id"`
-	AppName      string `json:"app_name,omitempty"`
-	AppDesc      string `json:"app_desc,omitempty"`
-	Status       *int32 `json:"status,omitempty"`
-	VisibleToAll *bool  `json:"visible_to_all,omitempty"`
+	AppID   string `json:"app_id"`
+	AppName string `json:"app_name,omitempty"`
+	AppDesc string `json:"app_desc,omitempty"`
+}
+
+// EventAppInstall 应用安装事件载荷（app.install）
+type EventAppInstall struct {
+	AppID   string `json:"app_id"`
+	AppName string `json:"app_name"`
+}
+
+// EventAppUninstall 应用卸载事件载荷（app.uninstall）
+type EventAppUninstall struct {
+	AppID   string `json:"app_id"`
+	AppName string `json:"app_name"`
+}
+
+// EventAppVisibilityUsers 应用可见性用户变更事件载荷（app.visibility.add_users/remove_users）
+type EventAppVisibilityUsers struct {
+	UserUnionUIDs []string `json:"user_union_uids"`
+}
+
+// EventTenantConfigUpdate 租户配置更新事件载荷（tenant.config.update）
+type EventTenantConfigUpdate struct {
+	ConfigKey  string          `json:"config_key"`
+	ConfigData json.RawMessage `json:"config_data"`
 }
 
 // ==================== 回调 ====================
